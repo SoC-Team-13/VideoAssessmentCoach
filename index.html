@@ -20,10 +20,15 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: var(--bg);
+    background-image: radial-gradient(1100px 700px at 75% -10%, #1a2440 0%, transparent 60%);
+    background-attachment: fixed;
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     min-height: 100vh;
   }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: #2a3342; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   header {
     padding: 20px 28px 8px;
     display: flex;
@@ -46,9 +51,11 @@
   .video-wrap {
     position: relative;
     background: #000;
+    border: 1px solid #242c3a;
     border-radius: var(--radius);
     overflow: hidden;
     aspect-ratio: 4 / 3;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
   }
   video, #overlay {
     position: absolute;
@@ -92,19 +99,65 @@
     background: rgba(14,17,22,0.8);
     backdrop-filter: blur(6px);
     border-left: 4px solid var(--accent);
-    border-radius: 10px;
-    padding: 11px 15px;
-    font-size: 0.97rem;
-    font-weight: 600;
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.35;
     opacity: 0;
     transform: translateY(8px);
     transition: opacity .3s, transform .3s;
     pointer-events: none;
   }
+  .coach #coachIcon { font-size: 1.6rem; }
   .coach.show { opacity: 1; transform: none; }
   .coach.warn { border-left-color: var(--warn); }
   .coach.bad  { border-left-color: var(--bad); }
   .coach.good { border-left-color: var(--good); }
+
+  .thumb {
+    position: absolute;
+    bottom: 70px;
+    z-index: 3;
+    animation: floatUp 1.7s ease-out both;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+  }
+  @keyframes floatUp {
+    0%   { opacity: 0; transform: translateY(24px) scale(0.4) rotate(-8deg); }
+    18%  { opacity: 1; transform: translateY(0) scale(1.2) rotate(6deg); }
+    100% { opacity: 0; transform: translateY(-190px) scale(1) rotate(-4deg); }
+  }
+
+  #countdown {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4;
+    font-size: 7rem;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 4px 28px rgba(0,0,0,0.65);
+    pointer-events: none;
+  }
+  #countdown:empty { display: none; }
+  #countdown span { display: inline-block; animation: pop 1s ease-in-out both; }
+  @keyframes pop {
+    0%   { transform: scale(0.35); opacity: 0; }
+    25%  { transform: scale(1.15); opacity: 1; }
+    75%  { transform: scale(1);    opacity: 1; }
+    100% { transform: scale(1.05); opacity: 0; }
+  }
+
+  .trend {
+    font-size: 0.74rem;
+    font-weight: 600;
+    margin-top: 4px;
+    min-height: 1em;
+    color: var(--muted);
+  }
 
   .rubric {
     border-top: 1px solid var(--panel-2);
@@ -300,6 +353,7 @@
       <canvas id="overlay"></canvas>
       <div class="badge" id="timer">00:00</div>
       <div class="coach" id="coach"><span id="coachIcon">💡</span><span id="coachText"></span></div>
+      <div id="countdown"></div>
     </div>
     <div class="controls">
       <button id="startBtn" disabled>Start session</button>
@@ -323,6 +377,7 @@
         <div class="center">
           <div class="num" id="overallNum">–</div>
           <div class="lbl">Overall</div>
+          <div class="trend" id="trendEl"></div>
         </div>
       </div>
     </div>
@@ -791,6 +846,45 @@ function coachTick() {
   if (now - coach.shownAt > 9000) coachEl.classList.remove("show");
 }
 
+/* ---------------- Trend detection & thumbs ---------------- */
+const trendEl = $("trendEl");
+let trendHist = [], lastThumbs = 0;
+
+function thumbsBurst() {
+  const wrap = document.querySelector(".video-wrap");
+  for (let i = 0; i < 6; i++) {
+    const el = document.createElement("span");
+    el.className = "thumb";
+    el.textContent = "👍";
+    el.style.left = (8 + Math.random() * 80) + "%";
+    el.style.animationDelay = (Math.random() * 0.55).toFixed(2) + "s";
+    el.style.fontSize = (2 + Math.random() * 1.3).toFixed(2) + "rem";
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+}
+
+function trendTick(now, overall) {
+  trendHist.push({ t: now, v: overall });
+  while (trendHist.length && now - trendHist[0].t > 24000) trendHist.shift();
+  const recent = trendHist.filter(p => now - p.t <= 6000);
+  const prior = trendHist.filter(p => now - p.t > 6000 && now - p.t <= 14000);
+  if (recent.length < 5 || prior.length < 5) { trendEl.textContent = ""; return; }
+  const avg = a => a.reduce((x, p) => x + p.v, 0) / a.length;
+  const diff = avg(recent) - avg(prior);
+  if (diff >= 2.5) {
+    trendEl.textContent = "▲ improving";
+    trendEl.style.color = "var(--good)";
+    if (now - lastThumbs > 18000) { thumbsBurst(); lastThumbs = now; }
+  } else if (diff <= -2.5) {
+    trendEl.textContent = "▼ slipping";
+    trendEl.style.color = "var(--bad)";
+  } else {
+    trendEl.textContent = "— steady";
+    trendEl.style.color = "var(--muted)";
+  }
+}
+
 /* ---------------- Rubric rendering ---------------- */
 function renderRubric(sc, container, withDesc) {
   container.innerHTML = RUBRIC.map(r => {
@@ -811,6 +905,7 @@ function renderScores(sc) {
   }
   const o = Math.round(clamp(sc.overall, 0, 100));
   overallNum.textContent = o;
+  overallNum.style.color = scoreColor(o);
   ringFill.style.strokeDashoffset = RING_CIRC * (1 - o / 100);
   ringFill.style.stroke = scoreColor(o);
   renderRubric(sc, $("rubricRows"), false);
@@ -894,6 +989,17 @@ startBtn.addEventListener("click", async () => {
   overlay.width = video.videoWidth;
   overlay.height = video.videoHeight;
 
+  // 3-2-1 countdown before scoring begins
+  statusEl.textContent = "Get ready…";
+  const countdownEl = $("countdown");
+  for (let i = 3; i >= 1; i--) {
+    countdownEl.innerHTML = `<span>${i}</span>`;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  countdownEl.innerHTML = "";
+
+  trendHist = [];
+  lastThumbs = 0;
   audioCtx = new AudioContext();
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = 2048;
@@ -909,9 +1015,12 @@ startBtn.addEventListener("click", async () => {
   stopBtn.disabled = false;
   statusEl.textContent = "Recording — present to the camera!";
   uiInterval = setInterval(() => {
-    timerEl.textContent = fmtTime((performance.now() - startTime) / 1000);
-    renderScores(computeScores());
+    const now = performance.now();
+    timerEl.textContent = fmtTime((now - startTime) / 1000);
+    const sc = computeScores();
+    renderScores(sc);
     coachTick();
+    trendTick(now, sc.overall);
   }, 600);
 });
 
@@ -929,6 +1038,8 @@ stopBtn.addEventListener("click", () => {
   coachEl.classList.remove("show");
   coach.lastFire = {};
   coach.shownAt = 0;
+  trendEl.textContent = "";
+  document.querySelectorAll(".thumb").forEach(el => el.remove());
   timerEl.classList.remove("rec");
   statusEl.textContent = "Session ended — see your report. Click Start to go again.";
   startBtn.disabled = false;
