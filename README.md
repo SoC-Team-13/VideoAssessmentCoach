@@ -5,6 +5,7 @@ A browser-based presentation coach that scores your public speaking in real time
 ## Features
 
 - **Live video + pose tracking** — webcam feed with a real-time skeleton overlay (MediaPipe Pose Landmarker)
+- **Upload mode** — assess a pre-recorded video (MP4/WebM): it plays through the same analysis pipeline and auto-generates the report when it ends. Note: browser speech recognition only hears the microphone, so the transcript is captured through your speakers — play the video at an audible volume
 - **Speech analysis** — live transcript via the Web Speech API, with filler words highlighted
 - **Voice analysis** — speaking-time ratio and volume consistency via the Web Audio API
 - **Live coaching banner** — real-time tips based on your last 10–20 seconds ("slow down — 190 wpm", "you're swaying — plant your feet", "face your audience")

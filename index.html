@@ -198,7 +198,9 @@
   button:hover:not(:disabled) { filter: brightness(1.12); }
   button:disabled { opacity: 0.4; cursor: default; }
   #startBtn { background: var(--accent); color: #fff; }
+  #uploadBtn { background: var(--panel-2); color: var(--text); border: 1px solid #2e3949; }
   #stopBtn { background: var(--bad); color: #fff; }
+  .video-wrap.upload video, .video-wrap.upload #overlay { transform: none; }
   .status { color: var(--muted); font-size: 0.88rem; }
 
   .transcript {
@@ -357,6 +359,8 @@
     </div>
     <div class="controls">
       <button id="startBtn" disabled>Start session</button>
+      <button id="uploadBtn" disabled>📁 Upload video</button>
+      <input type="file" id="fileInput" accept="video/*" hidden />
       <button id="stopBtn" disabled>Stop &amp; get score</button>
       <span class="status" id="status">Loading pose model…</span>
     </div>
@@ -418,6 +422,7 @@ import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@m
 const $ = (id) => document.getElementById(id);
 const video = $("video"), overlay = $("overlay"), ctx = overlay.getContext("2d");
 const startBtn = $("startBtn"), stopBtn = $("stopBtn"), statusEl = $("status");
+const uploadBtn = $("uploadBtn"), fileInput = $("fileInput");
 const timerEl = $("timer"), ringFill = $("ringFill"), overallNum = $("overallNum");
 const finalText = $("finalText"), interimText = $("interimText"), transcriptBox = $("transcript");
 const RING_CIRC = 414.7;
@@ -485,6 +490,10 @@ let landmarker = null;
 let stream = null, recognition = null, audioCtx = null, analyser = null;
 let running = false, startTime = 0, rafId = 0, uiInterval = 0;
 let lastVideoTime = -1;
+let mode = "live";  // "live" | "upload"
+// A media element can only ever get one MediaElementSource, so the upload
+// audio graph is created once and reused (suspended between sessions)
+let uploadCtx = null, uploadAnalyser = null, uploadSrcNode = null, objectUrl = null;
 
 const S = {}; // per-session aggregates, reset on start
 function resetSession() {
@@ -557,8 +566,9 @@ function highlightFillers(text) {
       runningMode: "VIDEO",
       numPoses: 1,
     });
-    statusEl.textContent = "Ready — click Start session";
+    statusEl.textContent = "Ready — start a live session or upload a video";
     startBtn.disabled = false;
+    uploadBtn.disabled = false;
   } catch (e) {
     statusEl.textContent = "Failed to load pose model (check network): " + e.message;
   }
@@ -928,7 +938,7 @@ function showReport() {
   const sc = S.scores;
   const secs = (performance.now() - startTime) / 1000;
   const o = Math.round(clamp(sc.overall || 0, 0, 100));
-  $("reportSub").textContent = `Session on ${new Date().toLocaleString()}`;
+  $("reportSub").textContent = `${mode === "upload" ? "Uploaded video" : "Live session"} · ${new Date().toLocaleString()}`;
   const g = $("reportGrade");
   g.textContent = `${o} · ${gradeFor(o)}`;
   g.style.color = scoreColor(o);
@@ -970,8 +980,34 @@ function showReport() {
 $("closeReport").addEventListener("click", () => { $("reportOverlay").hidden = true; });
 
 /* ---------------- Start / Stop ---------------- */
-startBtn.addEventListener("click", async () => {
+function beginSession(statusMsg) {
+  running = true;
+  startTime = performance.now();
+  lastVideoTime = -1;
+  trendHist = [];
+  lastThumbs = 0;
+  statusEl.textContent = statusMsg;
+  startRecognition();
+  poseLoop();
+  timerEl.classList.add("rec");
   startBtn.disabled = true;
+  uploadBtn.disabled = true;
+  stopBtn.disabled = false;
+  uiInterval = setInterval(() => {
+    const now = performance.now();
+    timerEl.textContent = fmtTime((now - startTime) / 1000);
+    const sc = computeScores();
+    renderScores(sc);
+    coachTick();
+    trendTick(now, sc.overall);
+  }, 600);
+}
+
+startBtn.addEventListener("click", async () => {
+  mode = "live";
+  startBtn.disabled = true;
+  uploadBtn.disabled = true;
+  video.muted = true;
   statusEl.textContent = "Requesting camera & microphone…";
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -981,6 +1017,7 @@ startBtn.addEventListener("click", async () => {
   } catch (e) {
     statusEl.textContent = "⚠️ Camera/mic access denied: " + e.message;
     startBtn.disabled = false;
+    uploadBtn.disabled = false;
     return;
   }
   resetSession();
@@ -998,42 +1035,84 @@ startBtn.addEventListener("click", async () => {
   }
   countdownEl.innerHTML = "";
 
-  trendHist = [];
-  lastThumbs = 0;
   audioCtx = new AudioContext();
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = 2048;
   audioCtx.createMediaStreamSource(stream).connect(analyser);
 
-  running = true;
-  startTime = performance.now();
-  lastVideoTime = -1;
-  startRecognition();
-  poseLoop();
-
-  timerEl.classList.add("rec");
-  stopBtn.disabled = false;
-  statusEl.textContent = "Recording — present to the camera!";
-  uiInterval = setInterval(() => {
-    const now = performance.now();
-    timerEl.textContent = fmtTime((now - startTime) / 1000);
-    const sc = computeScores();
-    renderScores(sc);
-    coachTick();
-    trendTick(now, sc.overall);
-  }, 600);
+  beginSession("Recording — present to the camera!");
 });
 
-stopBtn.addEventListener("click", () => {
+/* ---------------- Upload a recorded video ---------------- */
+uploadBtn.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  fileInput.value = "";
+  if (!file) return;
+  mode = "upload";
+  startBtn.disabled = true;
+  uploadBtn.disabled = true;
+  statusEl.textContent = "Loading video…";
+  resetSession();
+
+  document.querySelector(".video-wrap").classList.add("upload");
+  objectUrl = URL.createObjectURL(file);
+  video.srcObject = null;
+  video.src = objectUrl;
+  video.muted = false;
+  try {
+    await new Promise((res, rej) => {
+      video.onloadedmetadata = res;
+      video.onerror = () => rej(new Error("could not decode this file — try MP4/WebM"));
+    });
+  } catch (e) {
+    statusEl.textContent = "⚠️ " + e.message;
+    document.querySelector(".video-wrap").classList.remove("upload");
+    startBtn.disabled = false;
+    uploadBtn.disabled = false;
+    return;
+  }
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+
+  if (!uploadCtx) {
+    uploadCtx = new AudioContext();
+    uploadSrcNode = uploadCtx.createMediaElementSource(video);
+    uploadAnalyser = uploadCtx.createAnalyser();
+    uploadAnalyser.fftSize = 2048;
+    uploadSrcNode.connect(uploadAnalyser);
+    uploadAnalyser.connect(uploadCtx.destination);
+  }
+  await uploadCtx.resume();
+  analyser = uploadAnalyser;
+
+  video.onended = () => { if (running) stopSession(); };
+  await video.play();
+  beginSession("Analyzing uploaded video — transcript listens through your mic, so keep the volume audible.");
+});
+
+function stopSession() {
   running = false;
   stopBtn.disabled = true;
   cancelAnimationFrame(rafId);
   clearInterval(uiInterval);
   computeScores();
   if (recognition) { try { recognition.stop(); } catch {} recognition = null; }
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  if (audioCtx) { audioCtx.close(); audioCtx = null; analyser = null; }
-  video.srcObject = null;
+  if (mode === "live") {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    video.srcObject = null;
+  } else {
+    video.pause();
+    video.onended = null;
+    video.removeAttribute("src");
+    video.load();
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    if (uploadCtx) uploadCtx.suspend();
+    video.muted = true;
+    document.querySelector(".video-wrap").classList.remove("upload");
+  }
+  analyser = null;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
   coachEl.classList.remove("show");
   coach.lastFire = {};
@@ -1041,10 +1120,12 @@ stopBtn.addEventListener("click", () => {
   trendEl.textContent = "";
   document.querySelectorAll(".thumb").forEach(el => el.remove());
   timerEl.classList.remove("rec");
-  statusEl.textContent = "Session ended — see your report. Click Start to go again.";
+  statusEl.textContent = "Session ended — see your report. Start again or upload another video.";
   startBtn.disabled = false;
+  uploadBtn.disabled = false;
   showReport();
-});
+}
+stopBtn.addEventListener("click", stopSession);
 </script>
 </body>
 </html>
