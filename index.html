@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Presentation Coach</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #171c24;
+    --panel-2: #1e2530;
+    --text: #e8ecf1;
+    --muted: #8b95a5;
+    --accent: #4f8cff;
+    --good: #3ecf8e;
+    --warn: #f5b83d;
+    --bad: #f06a5c;
+    --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    background-image: radial-gradient(1100px 700px at 75% -10%, #1a2440 0%, transparent 60%);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: #2a3342; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  header {
+    padding: 20px 28px 8px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  header h1 { font-size: 1.35rem; font-weight: 700; }
+  header p { color: var(--muted); font-size: 0.9rem; }
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+    gap: 20px;
+    padding: 16px 28px 28px;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+  .stage { display: flex; flex-direction: column; gap: 14px; }
+  .video-wrap {
+    position: relative;
+    background: #000;
+    border: 1px solid #242c3a;
+    border-radius: var(--radius);
+    overflow: hidden;
+    aspect-ratio: 4 / 3;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  video, #overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* mirror for natural self-view */
+  }
+  .badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: 0.95rem;
+    z-index: 2;
+  }
+  .badge.rec::before {
+    content: "";
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--bad);
+    margin-right: 8px;
+    animation: blink 1.2s infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.25; } }
+
+  .coach {
+    position: absolute;
+    left: 12px; right: 12px; bottom: 12px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(14,17,22,0.8);
+    backdrop-filter: blur(6px);
+    border-left: 4px solid var(--accent);
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.35;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .3s, transform .3s;
+    pointer-events: none;
+  }
+  .coach #coachIcon { font-size: 1.6rem; }
+  .coach.show { opacity: 1; transform: none; }
+  .coach.warn { border-left-color: var(--warn); }
+  .coach.bad  { border-left-color: var(--bad); }
+  .coach.good { border-left-color: var(--good); }
+
+  .thumb {
+    position: absolute;
+    bottom: 70px;
+    z-index: 3;
+    animation: floatUp 1.7s ease-out both;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+  }
+  @keyframes floatUp {
+    0%   { opacity: 0; transform: translateY(24px) scale(0.4) rotate(-8deg); }
+    18%  { opacity: 1; transform: translateY(0) scale(1.2) rotate(6deg); }
+    100% { opacity: 0; transform: translateY(-190px) scale(1) rotate(-4deg); }
+  }
+
+  #countdown {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4;
+    font-size: 7rem;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 4px 28px rgba(0,0,0,0.65);
+    pointer-events: none;
+  }
+  #countdown:empty { display: none; }
+  #countdown span { display: inline-block; animation: pop 1s ease-in-out both; }
+  @keyframes pop {
+    0%   { transform: scale(0.35); opacity: 0; }
+    25%  { transform: scale(1.15); opacity: 1; }
+    75%  { transform: scale(1);    opacity: 1; }
+    100% { transform: scale(1.05); opacity: 0; }
+  }
+
+  .trend {
+    font-size: 0.74rem;
+    font-weight: 600;
+    margin-top: 4px;
+    min-height: 1em;
+    color: var(--muted);
+  }
+
+  .rubric {
+    border-top: 1px solid var(--panel-2);
+    padding-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .rubric h3 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+  .rubric .rrow {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.86rem;
+    gap: 8px;
+  }
+  .rubric .stars { color: var(--warn); letter-spacing: 2px; white-space: nowrap; }
+  .rubric .rlabel { color: var(--muted); font-size: 0.76rem; }
+  .rubric .src { color: var(--muted); font-size: 0.72rem; line-height: 1.45; margin-top: 2px; }
+  .report .rubric { border-top: none; padding-top: 0; margin-bottom: 22px; }
+  .report .rubric .rdesc { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+
+  .controls { display: flex; gap: 10px; align-items: center; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 22px;
+    cursor: pointer;
+    transition: filter .15s, opacity .15s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.12); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  #startBtn { background: var(--accent); color: #fff; }
+  #uploadBtn { background: var(--panel-2); color: var(--text); border: 1px solid #2e3949; }
+  #stopBtn { background: var(--bad); color: #fff; }
+  .video-wrap.upload video, .video-wrap.upload #overlay { transform: none; }
+  .status { color: var(--muted); font-size: 0.88rem; }
+
+  .transcript {
+    background: var(--panel);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    min-height: 110px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+  .transcript .label {
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .transcript .interim { color: var(--muted); }
+  .transcript mark {
+    background: rgba(240,106,92,0.25);
+    color: var(--bad);
+    border-radius: 4px;
+    padding: 0 3px;
+  }
+
+  .scores {
+    background: var(--panel);
+    border-radius: var(--radius);
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-self: start;
+  }
+  .ring-wrap { display: flex; justify-content: center; }
+  .ring { position: relative; width: 150px; height: 150px; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .track { stroke: var(--panel-2); }
+  .ring .fill {
+    stroke: var(--accent);
+    stroke-linecap: round;
+    transition: stroke-dashoffset .5s, stroke .5s;
+  }
+  .ring .center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .ring .center .num { font-size: 2.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ring .center .lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .metric { display: flex; flex-direction: column; gap: 5px; }
+  .metric .row { display: flex; justify-content: space-between; font-size: 0.88rem; }
+  .metric .name { color: var(--text); }
+  .metric .detail { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .bar {
+    height: 7px;
+    background: var(--panel-2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .bar > div {
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    background: var(--accent);
+    transition: width .4s, background .4s;
+  }
+
+  /* Report modal */
+  #reportOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 10;
+  }
+  #reportOverlay[hidden] { display: none; }
+  .report {
+    background: var(--panel);
+    border-radius: 18px;
+    padding: 30px 34px;
+    max-width: 640px;
+    width: 100%;
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+  .report h2 { font-size: 1.25rem; margin-bottom: 4px; }
+  .report .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+  .report .headline {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    margin-bottom: 22px;
+  }
+  .report .grade {
+    font-size: 3.4rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .report .headline .stats { color: var(--muted); font-size: 0.92rem; line-height: 1.7; }
+  .report .headline .stats b { color: var(--text); }
+  .report .metrics { display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; }
+  .report h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+  .chip {
+    background: var(--panel-2);
+    border-radius: 999px;
+    padding: 5px 13px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .chip b { color: var(--bad); }
+  .tips { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; }
+  .tips li {
+    background: var(--panel-2);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+  .report .actions { display: flex; justify-content: flex-end; }
+  #closeReport { background: var(--accent); color: #fff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎤 Presentation Coach</h1>
+  <p>Live pose &amp; speech analysis — practice and get scored in real time</p>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="video-wrap">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="overlay"></canvas>
+      <div class="badge" id="timer">00:00</div>
+      <div class="coach" id="coach"><span id="coachIcon">💡</span><span id="coachText"></span></div>
+      <div id="countdown"></div>
+    </div>
+    <div class="controls">
+      <button id="startBtn" disabled>Start session</button>
+      <button id="uploadBtn" disabled>📁 Upload video</button>
+      <input type="file" id="fileInput" accept="video/*" hidden />
+      <button id="stopBtn" disabled>Stop &amp; get score</button>
+      <span class="status" id="status">Loading pose model…</span>
+    </div>
+    <div class="transcript" id="transcript">
+      <span class="label">Live transcript</span>
+      <span id="finalText"></span><span class="interim" id="interimText"></span>
+    </div>
+  </section>
+
+  <aside class="scores">
+    <div class="ring-wrap">
+      <div class="ring">
+        <svg width="150" height="150">
+          <circle class="track" cx="75" cy="75" r="66" fill="none" stroke-width="11"/>
+          <circle class="fill" id="ringFill" cx="75" cy="75" r="66" fill="none" stroke-width="11"
+                  stroke-dasharray="414.7" stroke-dashoffset="414.7"/>
+        </svg>
+        <div class="center">
+          <div class="num" id="overallNum">–</div>
+          <div class="lbl">Overall</div>
+          <div class="trend" id="trendEl"></div>
+        </div>
+      </div>
+    </div>
+    <div id="metricList"></div>
+    <div class="rubric">
+      <h3>Rubric ratings</h3>
+      <div id="rubricRows"></div>
+      <div class="src">Based on the NCA Competent Speaker delivery competencies and the Toastmasters 5-point evaluation scale</div>
+    </div>
+  </aside>
+</main>
+
+<div id="reportOverlay" hidden>
+  <div class="report">
+    <h2>Session report</h2>
+    <p class="sub" id="reportSub"></p>
+    <div class="headline">
+      <div class="grade" id="reportGrade">–</div>
+      <div class="stats" id="reportStats"></div>
+    </div>
+    <div class="metrics" id="reportMetrics"></div>
+    <h3>Rubric ratings</h3>
+    <div class="rubric" id="reportRubric"></div>
+    <h3>Filler words</h3>
+    <div class="chips" id="fillerChips"></div>
+    <h3>Coaching tips</h3>
+    <ul class="tips" id="tipsList"></ul>
+    <div class="actions">
+      <button id="closeReport">Practice again</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+/* ---------------- DOM ---------------- */
+const $ = (id) => document.getElementById(id);
+const video = $("video"), overlay = $("overlay"), ctx = overlay.getContext("2d");
+const startBtn = $("startBtn"), stopBtn = $("stopBtn"), statusEl = $("status");
+const uploadBtn = $("uploadBtn"), fileInput = $("fileInput");
+const timerEl = $("timer"), ringFill = $("ringFill"), overallNum = $("overallNum");
+const finalText = $("finalText"), interimText = $("interimText"), transcriptBox = $("transcript");
+const RING_CIRC = 414.7;
+
+/* ---------------- Metric definitions ---------------- */
+const METRICS = [
+  { key: "posture",   name: "Posture",          weight: 0.15 },
+  { key: "stability", name: "Stability",        weight: 0.10 },
+  { key: "gestures",  name: "Hand gestures",    weight: 0.12 },
+  { key: "focus",     name: "Audience focus",   weight: 0.12 },
+  { key: "pace",      name: "Speaking pace",    weight: 0.18 },
+  { key: "fillers",   name: "Filler words",     weight: 0.15 },
+  { key: "voice",     name: "Voice presence",   weight: 0.18 },
+];
+
+/* Rubric grounded in the NCA Competent Speaker delivery competencies (5-8)
+   and the Toastmasters 5-point evaluation scale */
+const RUBRIC = [
+  { key: "vocal",   name: "Vocal variety & pace",
+    calc: s => (s.pace ?? 0) * 0.5 + (s.voice ?? 0) * 0.5,
+    desc: "Uses rate, volume & vocal energy to maintain interest (NCA Competency 6)" },
+  { key: "body",    name: "Body language",
+    calc: s => (s.posture ?? 0) * 0.4 + (s.gestures ?? 0) * 0.35 + (s.stability ?? 0) * 0.25,
+    desc: "Physical behaviors that support the verbal message (NCA Competency 8)" },
+  { key: "fluency", name: "Fluency & language",
+    calc: s => s.fillers ?? 0,
+    desc: "Clear wording with minimal filler words (NCA Competencies 5 & 7)" },
+  { key: "engage",  name: "Audience engagement",
+    calc: s => (s.focus ?? 0) * 0.65 + (s.voice ?? 0) * 0.35,
+    desc: "Faces and connects with the audience (Toastmasters: eye contact)" },
+];
+const RATING_LABELS = { 5: "Exemplary", 4: "Excels", 3: "Effective", 2: "Practicing", 1: "Developing" };
+const ratingOf = (v) => Math.max(1, Math.min(5, Math.ceil(v / 20)));
+const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+const metricEls = {};
+const metricList = $("metricList");
+for (const m of METRICS) {
+  const div = document.createElement("div");
+  div.className = "metric";
+  div.innerHTML = `
+    <div class="row"><span class="name">${m.name}</span><span class="detail" id="d-${m.key}">–</span></div>
+    <div class="bar"><div id="b-${m.key}"></div></div>`;
+  metricList.appendChild(div);
+  metricEls[m.key] = { bar: $(`b-${m.key}`), detail: $(`d-${m.key}`) };
+}
+
+/* ---------------- Helpers ---------------- */
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// Piecewise-linear map: pts = [[x0,y0],[x1,y1],...] sorted by x
+function mapRange(x, pts) {
+  if (x <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) {
+    if (x <= pts[i][0]) {
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+      return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+    }
+  }
+  return pts[pts.length - 1][1];
+}
+const scoreColor = (s) => s >= 75 ? "var(--good)" : s >= 50 ? "var(--warn)" : "var(--bad)";
+const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/* ---------------- Session state ---------------- */
+let landmarker = null;
+let stream = null, recognition = null, audioCtx = null, analyser = null;
+let running = false, startTime = 0, rafId = 0, uiInterval = 0;
+let lastVideoTime = -1;
+let mode = "live";  // "live" | "upload"
+// A media element can only ever get one MediaElementSource, so the upload
+// audio graph is created once and reused (suspended between sessions)
+let uploadCtx = null, uploadAnalyser = null, uploadSrcNode = null, objectUrl = null;
+
+const S = {}; // per-session aggregates, reset on start
+function resetSession() {
+  Object.assign(S, {
+    // pose
+    frames: 0,
+    postureSum: 0,
+    shoulderXHist: [],   // {t, x} normalized by shoulder width
+    wristSpeedHist: [],  // {t, v} shoulder-widths per second
+    prevWrists: null,
+    prevPoseTime: 0,
+    poseVisibleFrames: 0,
+    faceForwardFrames: 0,
+    // rolling windows for live coaching
+    postureRecent: [],   // {t, q}
+    faceRecent: [],      // {t, f}
+    speakRecent: [],     // {t, s}
+    wordEvents: [],      // {t, n}
+    fillerEvents: [],    // t
+    recent: {},
+    // speech
+    words: 0,
+    fillerCounts: {},
+    fillerTotal: 0,
+    // audio
+    rmsSamples: 0,
+    speakingSamples: 0,
+    speakingRmsSum: 0,
+    speakingRmsSqSum: 0,
+    // live scores
+    scores: {},
+  });
+  finalText.textContent = "";
+  interimText.textContent = "";
+}
+
+/* ---------------- Filler word detection ---------------- */
+const FILLERS = ["um", "uh", "er", "ah", "hmm", "like", "you know", "i mean", "sort of", "kind of", "basically", "actually", "literally"];
+function countFillers(text) {
+  const lower = text.toLowerCase();
+  for (const f of FILLERS) {
+    const re = new RegExp(`\\b${f.replace(" ", "\\s+")}\\b`, "g");
+    const n = (lower.match(re) || []).length;
+    if (n) {
+      S.fillerCounts[f] = (S.fillerCounts[f] || 0) + n;
+      S.fillerTotal += n;
+      for (let i = 0; i < n; i++) S.fillerEvents.push(performance.now());
+    }
+  }
+}
+function highlightFillers(text) {
+  let out = text.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  for (const f of FILLERS) {
+    const re = new RegExp(`\\b(${f.replace(" ", "\\s+")})\\b`, "gi");
+    out = out.replace(re, "<mark>$1</mark>");
+  }
+  return out;
+}
+
+/* ---------------- Pose model ---------------- */
+(async () => {
+  try {
+    const fileset = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+    landmarker = await PoseLandmarker.createFromOptions(fileset, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+        delegate: "GPU",
+      },
+      runningMode: "VIDEO",
+      numPoses: 1,
+    });
+    statusEl.textContent = "Ready — start a live session or upload a video";
+    startBtn.disabled = false;
+    uploadBtn.disabled = false;
+  } catch (e) {
+    statusEl.textContent = "Failed to load pose model (check network): " + e.message;
+  }
+})();
+
+/* ---------------- Pose analysis ---------------- */
+// Landmark indices: 0 nose, 11/12 shoulders, 15/16 wrists, 23/24 hips
+const CONNECTIONS = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+
+function analyzePose(lm, now) {
+  const nose = lm[0], ls = lm[11], rs = lm[12];
+  const sw = Math.hypot(ls.x - rs.x, ls.y - rs.y) || 1e-6; // shoulder width, normalizer
+  const midX = (ls.x + rs.x) / 2;
+
+  // Posture: level shoulders + head centered over shoulders
+  const shoulderLevel = 1 - clamp(Math.abs(ls.y - rs.y) / sw / 0.35, 0, 1);
+  const headCentered = 1 - clamp(Math.abs(nose.x - midX) / sw / 0.6, 0, 1);
+  const postureQ = (shoulderLevel * 0.5 + headCentered * 0.5) * 100;
+  S.postureSum += postureQ;
+  S.frames++;
+  S.postureRecent.push({ t: now, q: postureQ });
+  while (S.postureRecent.length && now - S.postureRecent[0].t > 12000) S.postureRecent.shift();
+
+  // Audience focus (eye-contact proxy): facing the camera — both ears
+  // detectable and nose horizontally between the shoulders
+  const earL = lm[7], earR = lm[8];
+  const facing = ((earL.visibility ?? 1) > 0.5 && (earR.visibility ?? 1) > 0.5 &&
+    nose.x > Math.min(ls.x, rs.x) && nose.x < Math.max(ls.x, rs.x)) ? 1 : 0;
+  S.faceForwardFrames += facing;
+  S.faceRecent.push({ t: now, f: facing });
+  while (S.faceRecent.length && now - S.faceRecent[0].t > 12000) S.faceRecent.shift();
+
+  // Stability: shoulder-midpoint x drift over a rolling window
+  S.shoulderXHist.push({ t: now, x: midX / sw });
+  while (S.shoulderXHist.length && now - S.shoulderXHist[0].t > 6000) S.shoulderXHist.shift();
+
+  // Gestures: wrist speed in shoulder-widths/sec
+  const wrists = [lm[15], lm[16]];
+  if (S.prevWrists && now > S.prevPoseTime) {
+    const dt = (now - S.prevPoseTime) / 1000;
+    let v = 0, n = 0;
+    for (let i = 0; i < 2; i++) {
+      if ((wrists[i].visibility ?? 1) > 0.5 && (S.prevWrists[i].visibility ?? 1) > 0.5) {
+        v += Math.hypot(wrists[i].x - S.prevWrists[i].x, wrists[i].y - S.prevWrists[i].y) / sw / dt;
+        n++;
+      }
+    }
+    S.wristSpeedHist.push({ t: now, v: n ? v / n : 0 });
+    while (S.wristSpeedHist.length && now - S.wristSpeedHist[0].t > 8000) S.wristSpeedHist.shift();
+  }
+  S.prevWrists = wrists.map(w => ({ ...w }));
+  S.prevPoseTime = now;
+  S.poseVisibleFrames++;
+}
+
+function drawPose(lm) {
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  if (!lm) return;
+  const W = overlay.width, H = overlay.height;
+  ctx.strokeStyle = "rgba(79,140,255,0.85)";
+  ctx.lineWidth = 3;
+  for (const [a, b] of CONNECTIONS) {
+    if ((lm[a].visibility ?? 1) < 0.4 || (lm[b].visibility ?? 1) < 0.4) continue;
+    ctx.beginPath();
+    ctx.moveTo(lm[a].x * W, lm[a].y * H);
+    ctx.lineTo(lm[b].x * W, lm[b].y * H);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#fff";
+  for (const i of [0, 11, 12, 13, 14, 15, 16, 23, 24]) {
+    if ((lm[i].visibility ?? 1) < 0.4) continue;
+    ctx.beginPath();
+    ctx.arc(lm[i].x * W, lm[i].y * H, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function poseLoop() {
+  if (!running) return;
+  if (video.currentTime !== lastVideoTime && video.videoWidth) {
+    lastVideoTime = video.currentTime;
+    const now = performance.now();
+    const result = landmarker.detectForVideo(video, now);
+    const lm = result.landmarks?.[0];
+    if (lm) {
+      analyzePose(lm, now);
+      drawPose(lm);
+    } else {
+      drawPose(null);
+    }
+  }
+  // Audio RMS sampling piggybacks on the frame loop
+  if (analyser) {
+    const buf = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    const rms = Math.sqrt(sum / buf.length);
+    S.rmsSamples++;
+    const speaking = rms > 0.015;  // speaking threshold
+    if (speaking) {
+      S.speakingSamples++;
+      S.speakingRmsSum += rms;
+      S.speakingRmsSqSum += rms * rms;
+    }
+    const tNow = performance.now();
+    S.speakRecent.push({ t: tNow, s: speaking ? 1 : 0 });
+    while (S.speakRecent.length && tNow - S.speakRecent[0].t > 12000) S.speakRecent.shift();
+  }
+  rafId = requestAnimationFrame(poseLoop);
+}
+
+/* ---------------- Speech recognition ---------------- */
+function startRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    statusEl.textContent = "⚠️ Speech recognition unavailable — use Chrome. Scoring pose + voice only.";
+    return;
+  }
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+  recognition.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const text = e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        const n = text.trim().split(/\s+/).filter(Boolean).length;
+        S.words += n;
+        S.wordEvents.push({ t: performance.now(), n });
+        countFillers(text);
+        finalText.innerHTML += highlightFillers(text) + " ";
+      } else {
+        interim += text;
+      }
+    }
+    interimText.textContent = interim;
+    transcriptBox.scrollTop = transcriptBox.scrollHeight;
+  };
+  recognition.onend = () => { if (running) { try { recognition.start(); } catch {} } };
+  recognition.onerror = (e) => {
+    if (e.error === "not-allowed") statusEl.textContent = "⚠️ Mic access denied — speech scoring disabled.";
+  };
+  recognition.start();
+}
+
+/* ---------------- Scoring ---------------- */
+function computeScores() {
+  const elapsedMin = Math.max((performance.now() - startTime) / 60000, 1 / 60);
+  const sc = {};
+
+  // Posture — average frame quality
+  sc.posture = S.frames ? S.postureSum / S.frames : 0;
+  metricEls.posture.detail.textContent = S.frames ? `${Math.round(sc.posture)}` : "no pose";
+
+  // Stability — std-dev of shoulder x position (in shoulder-widths) over window
+  let swaySd = 0;
+  if (S.shoulderXHist.length > 10) {
+    const xs = S.shoulderXHist.map(p => p.x);
+    const mean = xs.reduce((a, b) => a + b) / xs.length;
+    swaySd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / xs.length);
+    sc.stability = mapRange(swaySd, [[0.05, 100], [0.15, 90], [0.5, 55], [1.2, 15]]);
+    metricEls.stability.detail.textContent = swaySd < 0.15 ? "steady" : swaySd < 0.5 ? "some sway" : "swaying";
+  } else { sc.stability = 60; metricEls.stability.detail.textContent = "–"; }
+
+  // Audience focus — fraction of frames facing the camera
+  if (S.poseVisibleFrames > 10) {
+    const ratio = S.faceForwardFrames / S.poseVisibleFrames;
+    sc.focus = mapRange(ratio, [[0.15, 10], [0.4, 40], [0.7, 75], [0.95, 100]]);
+    metricEls.focus.detail.textContent = `${Math.round(ratio * 100)}% facing`;
+  } else { sc.focus = 50; metricEls.focus.detail.textContent = "–"; }
+
+  // Gestures — average wrist speed; frozen or flailing both penalized
+  if (S.wristSpeedHist.length > 5) {
+    const avg = S.wristSpeedHist.reduce((a, p) => a + p.v, 0) / S.wristSpeedHist.length;
+    sc.gestures = mapRange(avg, [[0, 30], [0.05, 45], [0.25, 90], [0.6, 100], [2.5, 80], [5, 50]]);
+    metricEls.gestures.detail.textContent = avg < 0.05 ? "very still" : avg < 2.5 ? "expressive" : "very busy";
+  } else { sc.gestures = 50; metricEls.gestures.detail.textContent = "–"; }
+
+  // Pace — words per minute (session-wide)
+  const wpm = S.words / elapsedMin;
+  sc.pace = S.words < 5 ? 30 : mapRange(wpm, [[40, 20], [80, 60], [110, 95], [160, 100], [190, 65], [240, 20]]);
+  metricEls.pace.detail.textContent = `${Math.round(wpm)} wpm`;
+
+  // Fillers — rate per minute
+  const fpm = S.fillerTotal / elapsedMin;
+  sc.fillers = mapRange(fpm, [[0, 100], [2, 88], [5, 60], [10, 30], [15, 5]]);
+  metricEls.fillers.detail.textContent = `${S.fillerTotal} total`;
+
+  // Voice presence — how much of the time you're audibly speaking + volume consistency
+  if (S.rmsSamples > 20) {
+    const ratio = S.speakingSamples / S.rmsSamples;
+    const ratioScore = mapRange(ratio, [[0.05, 20], [0.3, 60], [0.55, 90], [0.75, 100], [0.95, 95]]);
+    let consistScore = 70;
+    if (S.speakingSamples > 20) {
+      const mean = S.speakingRmsSum / S.speakingSamples;
+      const varc = S.speakingRmsSqSum / S.speakingSamples - mean * mean;
+      const cv = Math.sqrt(Math.max(varc, 0)) / (mean || 1e-6);
+      consistScore = mapRange(cv, [[0.2, 100], [0.6, 80], [1.2, 50]]);
+    }
+    sc.voice = ratioScore * 0.7 + consistScore * 0.3;
+    metricEls.voice.detail.textContent = `${Math.round((S.speakingSamples / S.rmsSamples) * 100)}% speaking`;
+  } else { sc.voice = 50; metricEls.voice.detail.textContent = "–"; }
+
+  // Overall (weighted)
+  let overall = 0;
+  for (const m of METRICS) overall += (sc[m.key] || 0) * m.weight;
+  sc.overall = overall;
+  S.scores = sc;
+
+  // Rolling-window stats for the live coach (last ~10-20s)
+  const now = performance.now();
+  const winMs = Math.min(now - startTime, 20000);
+  const recentWords = S.wordEvents.filter(p => now - p.t <= winMs).reduce((a, p) => a + p.n, 0);
+  const avgOf = (arr, f) => arr.length ? arr.reduce((a, p) => a + f(p), 0) / arr.length : null;
+  S.recent = {
+    wpm: winMs > 5000 ? recentWords / (winMs / 60000) : null,
+    fillers20: S.fillerEvents.filter(t => now - t <= 20000).length,
+    posture: avgOf(S.postureRecent, p => p.q),
+    face: avgOf(S.faceRecent, p => p.f),
+    speak: avgOf(S.speakRecent, p => p.s),
+    wrist: avgOf(S.wristSpeedHist, p => p.v),
+    sway: swaySd,
+  };
+  return sc;
+}
+
+/* ---------------- Live coach ---------------- */
+const coachEl = $("coach"), coachIcon = $("coachIcon"), coachText = $("coachText");
+const speechAvailable = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+// Rules checked in priority order against the last ~10-20s of behavior
+const COACH_RULES = [
+  { id: "pace-fast", cool: 25, type: "warn", icon: "🐇",
+    test: (r) => speechAvailable && r.wpm !== null && r.wpm > 185,
+    msg: (r) => `Slow down — you're at ${Math.round(r.wpm)} wpm. Aim for 110–160.` },
+  { id: "fillers", cool: 20, type: "warn", icon: "🤐",
+    test: (r) => r.fillers20 >= 2,
+    msg: () => `Filler words creeping in — try a silent pause instead of "um" or "like".` },
+  { id: "sway", cool: 25, type: "warn", icon: "🧍",
+    test: (r) => r.sway > 0.5,
+    msg: () => "You're swaying — plant your feet shoulder-width apart and settle." },
+  { id: "posture", cool: 25, type: "warn", icon: "🪑",
+    test: (r) => r.posture !== null && r.posture < 55,
+    msg: () => "Reset your posture — level your shoulders and bring your head upright." },
+  { id: "focus", cool: 25, type: "warn", icon: "👀",
+    test: (r, el) => el > 10000 && r.face !== null && r.face < 0.5,
+    msg: () => "Face your audience — bring your eyes back to the camera." },
+  { id: "quiet", cool: 30, type: "bad", icon: "🔊",
+    test: (r, el) => el > 15000 && r.speak !== null && r.speak < 0.25,
+    msg: () => "Keep your momentum — project your voice and keep talking." },
+  { id: "pace-slow", cool: 30, type: "warn", icon: "🐢",
+    test: (r) => speechAvailable && r.wpm !== null && r.wpm > 20 && r.wpm < 85,
+    msg: (r) => `Pick up the pace a little — ${Math.round(r.wpm)} wpm. Aim for 110–160.` },
+  { id: "gestures", cool: 35, type: "warn", icon: "👐",
+    test: (r, el) => el > 15000 && r.wrist !== null && r.wrist < 0.05,
+    msg: () => "Free your hands — use open gestures to emphasize your points." },
+  { id: "praise", cool: 30, type: "good", icon: "✨",
+    test: (r, el) => el > 15000 && (S.scores.overall || 0) > 68,
+    msg: () => PRAISE[coach.praiseIdx++ % PRAISE.length] },
+];
+const PRAISE = [
+  "Great delivery — keep it up!",
+  "Nice pace and presence — stay with it.",
+  "Strong connection with the camera — well done.",
+  "Good energy — your audience is with you.",
+];
+const coach = { shownAt: 0, lastFire: {}, praiseIdx: 0 };
+
+function coachTick() {
+  if (!running || !S.recent) return;
+  const now = performance.now();
+  if (now - coach.shownAt < 6000) return;  // let the current tip breathe
+  const elapsed = now - startTime;
+  for (const rule of COACH_RULES) {
+    if (now - (coach.lastFire[rule.id] || -1e9) < rule.cool * 1000) continue;
+    if (!rule.test(S.recent, elapsed)) continue;
+    coachIcon.textContent = rule.icon;
+    coachText.textContent = rule.msg(S.recent);
+    coachEl.className = `coach show ${rule.type}`;
+    coach.lastFire[rule.id] = now;
+    coach.shownAt = now;
+    return;
+  }
+  if (now - coach.shownAt > 9000) coachEl.classList.remove("show");
+}
+
+/* ---------------- Trend detection & thumbs ---------------- */
+const trendEl = $("trendEl");
+let trendHist = [], lastThumbs = 0;
+
+function thumbsBurst() {
+  const wrap = document.querySelector(".video-wrap");
+  for (let i = 0; i < 6; i++) {
+    const el = document.createElement("span");
+    el.className = "thumb";
+    el.textContent = "👍";
+    el.style.left = (8 + Math.random() * 80) + "%";
+    el.style.animationDelay = (Math.random() * 0.55).toFixed(2) + "s";
+    el.style.fontSize = (2 + Math.random() * 1.3).toFixed(2) + "rem";
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+}
+
+function trendTick(now, overall) {
+  trendHist.push({ t: now, v: overall });
+  while (trendHist.length && now - trendHist[0].t > 24000) trendHist.shift();
+  const recent = trendHist.filter(p => now - p.t <= 6000);
+  const prior = trendHist.filter(p => now - p.t > 6000 && now - p.t <= 14000);
+  if (recent.length < 5 || prior.length < 5) { trendEl.textContent = ""; return; }
+  const avg = a => a.reduce((x, p) => x + p.v, 0) / a.length;
+  const diff = avg(recent) - avg(prior);
+  if (diff >= 2.5) {
+    trendEl.textContent = "▲ improving";
+    trendEl.style.color = "var(--good)";
+    if (now - lastThumbs > 18000) { thumbsBurst(); lastThumbs = now; }
+  } else if (diff <= -2.5) {
+    trendEl.textContent = "▼ slipping";
+    trendEl.style.color = "var(--bad)";
+  } else {
+    trendEl.textContent = "— steady";
+    trendEl.style.color = "var(--muted)";
+  }
+}
+
+/* ---------------- Rubric rendering ---------------- */
+function renderRubric(sc, container, withDesc) {
+  container.innerHTML = RUBRIC.map(r => {
+    const rating = ratingOf(r.calc(sc));
+    return `
+      <div class="rrow">
+        <span>${r.name}${withDesc ? `<div class="rdesc">${r.desc}</div>` : ""}</span>
+        <span class="stars">${stars(rating)} <span class="rlabel">${RATING_LABELS[rating]}</span></span>
+      </div>`;
+  }).join("");
+}
+
+function renderScores(sc) {
+  for (const m of METRICS) {
+    const v = clamp(sc[m.key] || 0, 0, 100);
+    metricEls[m.key].bar.style.width = v + "%";
+    metricEls[m.key].bar.style.background = scoreColor(v);
+  }
+  const o = Math.round(clamp(sc.overall, 0, 100));
+  overallNum.textContent = o;
+  overallNum.style.color = scoreColor(o);
+  ringFill.style.strokeDashoffset = RING_CIRC * (1 - o / 100);
+  ringFill.style.stroke = scoreColor(o);
+  renderRubric(sc, $("rubricRows"), false);
+}
+
+/* ---------------- Report ---------------- */
+const TIPS = {
+  posture: "Keep your shoulders level and your head centered over your body. Imagine a string pulling you up from the crown of your head.",
+  stability: "Plant your feet shoulder-width apart and avoid rocking side to side — move with purpose, not from nerves.",
+  gestures: "Use open hand gestures to emphasize key points. Aim for natural movement in the box between your waist and shoulders.",
+  focus: "Keep your eyes on the camera as if it were your audience — glancing away or turning your head breaks the connection.",
+  pace: "Target 110–160 words per minute. Practice pausing at the end of sentences instead of rushing to the next one.",
+  fillers: "Replace filler words with a silent pause — a beat of silence sounds far more confident than an \"um\".",
+  voice: "Project your voice and keep talking momentum. Long dead-air gaps (beyond deliberate pauses) lose the audience.",
+};
+function gradeFor(s) {
+  return s >= 90 ? "A" : s >= 80 ? "A–" : s >= 72 ? "B+" : s >= 64 ? "B" : s >= 55 ? "C+" : s >= 45 ? "C" : "D";
+}
+function showReport() {
+  const sc = S.scores;
+  const secs = (performance.now() - startTime) / 1000;
+  const o = Math.round(clamp(sc.overall || 0, 0, 100));
+  $("reportSub").textContent = `${mode === "upload" ? "Uploaded video" : "Live session"} · ${new Date().toLocaleString()}`;
+  const g = $("reportGrade");
+  g.textContent = `${o} · ${gradeFor(o)}`;
+  g.style.color = scoreColor(o);
+  $("reportStats").innerHTML =
+    `Duration: <b>${fmtTime(secs)}</b><br>` +
+    `Words spoken: <b>${S.words}</b> (<b>${Math.round(S.words / Math.max(secs / 60, 1/60))} wpm</b>)<br>` +
+    `Filler words: <b>${S.fillerTotal}</b>`;
+
+  const rm = $("reportMetrics");
+  rm.innerHTML = "";
+  for (const m of METRICS) {
+    const v = Math.round(clamp(sc[m.key] || 0, 0, 100));
+    rm.innerHTML += `
+      <div class="metric">
+        <div class="row"><span class="name">${m.name}</span><span class="detail">${v}/100</span></div>
+        <div class="bar"><div style="width:${v}%;background:${scoreColor(v)}"></div></div>
+      </div>`;
+  }
+
+  renderRubric(sc, $("reportRubric"), true);
+
+  const chips = $("fillerChips");
+  const entries = Object.entries(S.fillerCounts).sort((a, b) => b[1] - a[1]);
+  chips.innerHTML = entries.length
+    ? entries.map(([w, n]) => `<span class="chip">"${w}" <b>×${n}</b></span>`).join("")
+    : `<span class="chip">None detected — nice! 🎉</span>`;
+
+  const tips = $("tipsList");
+  const weakest = METRICS.map(m => ({ ...m, v: sc[m.key] || 0 }))
+    .sort((a, b) => a.v - b.v)
+    .filter(m => m.v < 80)
+    .slice(0, 3);
+  tips.innerHTML = weakest.length
+    ? weakest.map(m => `<li><b>${m.name}:</b> ${TIPS[m.key]}</li>`).join("")
+    : `<li>Excellent across the board — keep rehearsing to stay sharp! 🌟</li>`;
+
+  $("reportOverlay").hidden = false;
+}
+$("closeReport").addEventListener("click", () => { $("reportOverlay").hidden = true; });
+
+/* ---------------- Start / Stop ---------------- */
+function beginSession(statusMsg) {
+  running = true;
+  startTime = performance.now();
+  lastVideoTime = -1;
+  trendHist = [];
+  lastThumbs = 0;
+  statusEl.textContent = statusMsg;
+  startRecognition();
+  poseLoop();
+  timerEl.classList.add("rec");
+  startBtn.disabled = true;
+  uploadBtn.disabled = true;
+  stopBtn.disabled = false;
+  uiInterval = setInterval(() => {
+    const now = performance.now();
+    timerEl.textContent = fmtTime((now - startTime) / 1000);
+    const sc = computeScores();
+    renderScores(sc);
+    coachTick();
+    trendTick(now, sc.overall);
+  }, 600);
+}
+
+startBtn.addEventListener("click", async () => {
+  mode = "live";
+  startBtn.disabled = true;
+  uploadBtn.disabled = true;
+  video.muted = true;
+  statusEl.textContent = "Requesting camera & microphone…";
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 1280, height: 960, facingMode: "user" },
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
+  } catch (e) {
+    statusEl.textContent = "⚠️ Camera/mic access denied: " + e.message;
+    startBtn.disabled = false;
+    uploadBtn.disabled = false;
+    return;
+  }
+  resetSession();
+  video.srcObject = stream;
+  await new Promise(r => video.onloadedmetadata = r);
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+
+  // 3-2-1 countdown before scoring begins
+  statusEl.textContent = "Get ready…";
+  const countdownEl = $("countdown");
+  for (let i = 3; i >= 1; i--) {
+    countdownEl.innerHTML = `<span>${i}</span>`;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  countdownEl.innerHTML = "";
+
+  audioCtx = new AudioContext();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+
+  beginSession("Recording — present to the camera!");
+});
+
+/* ---------------- Upload a recorded video ---------------- */
+uploadBtn.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  fileInput.value = "";
+  if (!file) return;
+  mode = "upload";
+  startBtn.disabled = true;
+  uploadBtn.disabled = true;
+  statusEl.textContent = "Loading video…";
+  resetSession();
+
+  document.querySelector(".video-wrap").classList.add("upload");
+  objectUrl = URL.createObjectURL(file);
+  video.srcObject = null;
+  video.src = objectUrl;
+  video.muted = false;
+  try {
+    await new Promise((res, rej) => {
+      video.onloadedmetadata = res;
+      video.onerror = () => rej(new Error("could not decode this file — try MP4/WebM"));
+    });
+  } catch (e) {
+    statusEl.textContent = "⚠️ " + e.message;
+    document.querySelector(".video-wrap").classList.remove("upload");
+    startBtn.disabled = false;
+    uploadBtn.disabled = false;
+    return;
+  }
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+
+  if (!uploadCtx) {
+    uploadCtx = new AudioContext();
+    uploadSrcNode = uploadCtx.createMediaElementSource(video);
+    uploadAnalyser = uploadCtx.createAnalyser();
+    uploadAnalyser.fftSize = 2048;
+    uploadSrcNode.connect(uploadAnalyser);
+    uploadAnalyser.connect(uploadCtx.destination);
+  }
+  await uploadCtx.resume();
+  analyser = uploadAnalyser;
+
+  video.onended = () => { if (running) stopSession(); };
+  await video.play();
+  beginSession("Analyzing uploaded video — transcript listens through your mic, so keep the volume audible.");
+});
+
+function stopSession() {
+  running = false;
+  stopBtn.disabled = true;
+  cancelAnimationFrame(rafId);
+  clearInterval(uiInterval);
+  computeScores();
+  if (recognition) { try { recognition.stop(); } catch {} recognition = null; }
+  if (mode === "live") {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+    video.srcObject = null;
+  } else {
+    video.pause();
+    video.onended = null;
+    video.removeAttribute("src");
+    video.load();
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    if (uploadCtx) uploadCtx.suspend();
+    video.muted = true;
+    document.querySelector(".video-wrap").classList.remove("upload");
+  }
+  analyser = null;
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  coachEl.classList.remove("show");
+  coach.lastFire = {};
+  coach.shownAt = 0;
+  trendEl.textContent = "";
+  document.querySelectorAll(".thumb").forEach(el => el.remove());
+  timerEl.classList.remove("rec");
+  statusEl.textContent = "Session ended — see your report. Start again or upload another video.";
+  startBtn.disabled = false;
+  uploadBtn.disabled = false;
+  showReport();
+}
+stopBtn.addEventListener("click", stopSession);
+</script>
+</body>
+</html>
