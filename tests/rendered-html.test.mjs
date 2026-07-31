@@ -36,7 +36,7 @@ test("server-renders the Video Assessment Coach landing page", async () => {
   assert.doesNotMatch(html, /Your site is taking shape|codex-preview/);
 });
 
-test("includes the five GitHub organization owners and researched profiles", async () => {
+test("includes the seven GitHub organization owners and researched profiles", async () => {
   const page = await readFile(
     new URL("../app/page.tsx", import.meta.url),
     "utf8",
@@ -48,9 +48,11 @@ test("includes the five GitHub organization owners and researched profiles", asy
 
   for (const handle of [
     "haroldsoh",
+    "jiafei1224",
     "knmnyn",
     "liuanji",
     "WenqiJiang",
+    "yecwang-sudo",
     "xkxiao",
   ]) {
     assert.match(page, new RegExp(`github\\.com/${handle}`));

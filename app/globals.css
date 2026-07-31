@@ -1137,6 +1137,11 @@ button:hover .arrow {
   background: var(--paper);
 }
 
+.person-card:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(260px, 0.52fr) minmax(360px, 1.48fr);
+}
+
 .person-photo-wrap {
   position: relative;
   min-height: 100%;
@@ -1348,6 +1353,11 @@ a:focus-visible {
   }
 
   .person-card {
+    grid-template-columns: 1fr;
+  }
+
+  .person-card:last-child:nth-child(odd) {
+    grid-column: auto;
     grid-template-columns: 1fr;
   }
 

@@ -16,6 +16,16 @@ const team = [
     profile: "https://www.comp.nus.edu.sg/cs/people/hsoh/",
   },
   {
+    name: "Jiafei Duan",
+    handle: "jiafei1224",
+    title: "NUS Presidential Young Professor",
+    image: "team/jiafei-duan.jpg",
+    bio: "Directs the MAGIC Lab and works at the intersection of robotics and computer vision, with a focus on embodied AI and robotics foundation models.",
+    areas: ["Robot learning", "Embodied AI", "Computer vision"],
+    github: "https://github.com/jiafei1224",
+    profile: "https://www.comp.nus.edu.sg/cs/people/duanjf/",
+  },
+  {
     name: "Min-Yen Kan",
     handle: "knmnyn",
     title: "Associate Professor & Vice-Dean, NUS Computing",
@@ -44,6 +54,16 @@ const team = [
     areas: ["ML systems", "Data systems", "RAG"],
     github: "https://github.com/WenqiJiang",
     profile: "https://www.comp.nus.edu.sg/cs/people/jiangwq/",
+  },
+  {
+    name: "Ye Wang",
+    handle: "yecwang-sudo",
+    title: "Associate Professor, NUS Computing",
+    image: "team/ye-wang.png",
+    bio: "Researches sound and music computing for human health and potential, spanning audio analysis, mobile systems, e-health, and technology-supported learning.",
+    areas: ["Sound & music", "eHealth", "Audio computing"],
+    github: "https://github.com/yecwang-sudo",
+    profile: "https://www.comp.nus.edu.sg/cs/people/wangye/",
   },
   {
     name: "Xiaokui Xiao",
@@ -371,12 +391,12 @@ function Team() {
           <em>Human purpose.</em>
         </h1>
         <p>
-          Video Assessment Coach is stewarded by five owners of the project’s
+          Video Assessment Coach is stewarded by seven owners of the project’s
           GitHub organization—researchers spanning learning, language, reliable
-          AI, intelligent systems, robotics, and data.
+          AI, intelligent systems, robotics, sound, and data.
         </p>
         <div className="team-count">
-          <strong>05</strong>
+          <strong>07</strong>
           <span>GitHub organization owners<br />at NUS Computing</span>
         </div>
       </section>
