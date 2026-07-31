@@ -44,6 +44,7 @@ Then open [http://localhost:3000](http://localhost:3000).
 
 ```bash
 npm run build
+npm run build:pages
 npm test
 ```
 
@@ -54,3 +55,5 @@ npm test
 - `public/team/` contains portraits sourced from public GitHub profiles.
 - `public/og.png` is the project’s social preview card.
 - `index.html` contains the standalone presentation coach.
+- `pages-src/` is the GitHub Pages entry point; `npm run build:pages` writes the
+  published static site to `docs/`.
